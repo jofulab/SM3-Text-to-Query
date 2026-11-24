@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sm3-logo-dark.svg">
+    <img src="docs/assets/sm3-logo.svg" alt="SM3-Text-to-Query" width="380">
+  </picture>
+</p>
+
 # SM3-Text-to-Query: <ins>S</ins>ynthetic <ins>M</ins>ulti-<ins>M</ins>odel <ins>M</ins>edical Text-to-Query Benchmark
 
 ![Differences across query languages and database systems for the same user request](./docs/assets/querydifference.png)
