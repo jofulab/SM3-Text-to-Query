@@ -238,15 +238,6 @@ mql_schema = {
                 "OWNER_NAME": "<STRING>",
             }
         ],
-        "EXPENSES": [
-            {
-                "YEAR": "<DATE>",
-                "PAYER_REF": "<REF>",
-                "HEALTHCARE_EXPENSES": "<NUMBER>",
-                "INSURANCE_COSTS": "<NUMBER>",
-                "COVERED_COSTS": "<NUMBER>",
-            }
-        ],
     },
     "organizations": {
         "ORGANIZATION_ID": "<UUID>",
@@ -299,7 +290,7 @@ mql_schema = {
 
 mql_schema = str(mql_schema)
 
-cypher_schema = """Encounter {code: STRING, id: STRING, end: DATE_TIME, reasonCode: STRING, reasonDescription: STRING, isEnd: BOOLEAN, claimCost: FLOAT, coveredAmount: FLOAT, class: STRING, baseCost: FLOAT, date: DATE_TIME, description: STRING},Patient {county: STRING, birthplace: STRING, ethnicity: STRING, maiden: STRING, marital: STRING, race: STRING, firstName: STRING, lastName: STRING, passport: STRING, prefix: STRING, suffix: STRING, SSN: STRING, drivers: STRING, gender: STRING, birthDate: DATE_TIME, city: STRING, state: STRING, address: STRING, healthcareCoverage: FLOAT, income: FLOAT, FIPS: STRING, healthcareExpenses: FLOAT, zip: STRING, id: STRING, deathDate: DATE_TIME},Provider {zip: STRING, encounters: STRING, name: STRING, state: STRING, address: STRING, city: STRING, lat: STRING, lon: STRING, procedures: STRING, gender: STRING, speciality: STRING, id: STRING},Payer {qols_avg: FLOAT, member_months: FLOAT, uncovered_procedures: INTEGER, covered_immunizations: INTEGER, uncovered_immunizations: INTEGER, unique_customers: INTEGER, uncovered_encounters: INTEGER, covered_medications: INTEGER, uncovered_medications: INTEGER, covered_procedures: INTEGER, amount_uncovered: FLOAT, revenue: FLOAT, phone: STRING, amount_covered: FLOAT, covered_encounters: INTEGER, ownership: STRING, state: STRING, zip: STRING, address: STRING, name: STRING, city: STRING, id: STRING},PayerTransition {memberid: STRING},Organization {phone: STRING, revenue: STRING, utilization: STRING, name: STRING, state: STRING, address: STRING, city: STRING, lat: STRING, lon: STRING, id: STRING},Medication {payerCoverage: FLOAT, totalCost: FLOAT, stop: DATE_TIME, reasonDescription: STRING, reasonCode: STRING, code: STRING, start: DATE_TIME, description: STRING, dispenses: INTEGER, baseCost: FLOAT},Condition {code: STRING, start: DATE_TIME, description: STRING, stop: DATE_TIME},CarePlan {encounterId: STRING, patientId: STRING, stop: DATE_TIME, code: STRING, id: STRING, start: DATE_TIME, reasondescription: STRING, description: STRING, reasoncode: STRING},Allergy {description2: STRING, severity2: STRING, code: STRING, severity1: STRING, reaction2: STRING, category: STRING, reaction1: STRING, description1: STRING, system: STRING, type: STRING, description: STRING, start: DATE_TIME},Address {address: STRING, location: POINT, city: STRING, state: STRING, zip: STRING, county: STRING, longitude: FLOAT, FIPS: STRING, latitude: FLOAT},Procedure {code: STRING, reasondescription: STRING, start: DATE_TIME, codes: STRING, reasoncode: STRING, basecost: STRING, description: STRING, stop: DATE_TIME},Claim {providerId: STRING, lastBilledDateP: DATE_TIME, lastBilledDate2: DATE_TIME, lastBilledDate1: DATE_TIME, statusP: STRING, healthcareClaimTypeId1: STRING, healthcareClaimTypeId2: STRING, status1: STRING, status2: STRING, supervisingProviderId: STRING, serviceDate: DATE_TIME, outstandingP: STRING, currentIllnessDate: DATE_TIME, outstanding2: STRING, appointmentId: STRING, diagnosis4: STRING, referringProviderId: STRING, departmentId: STRING, outstanding1: STRING, diagnosis1: STRING, diagnosis2: STRING, diagnosis3: STRING, patientId: STRING, id: STRING},ClaimTransaction {unitAmount: FLOAT, transferOutId: STRING, procedureCode: STRING, modifier2: STRING, notes: STRING, placeOfService: STRING, toDate: DATE_TIME, modifier1: STRING, method: STRING, fromDate: DATE_TIME, providerId: STRING, patientId: STRING, units: STRING, chargeId: STRING, amount: FLOAT, id: STRING, transfers: FLOAT, type: STRING, claimId: STRING, adjustments: FLOAT, outstanding: FLOAT, transferType: STRING, payments: FLOAT, lineNote: STRING},Device {udi: STRING, code: STRING, description: STRING, start: DATE_TIME, stop: DATE_TIME},ImagingStudy {encounterId: STRING, patientId: STRING, sopDescription: STRING, sopCode: STRING, instanceUid: STRING, modalityDescription: STRING, procedureCode: STRING, id: STRING, bodySiteCode: STRING, modalityCode: STRING, seriesUid: STRING, date: DATE_TIME, bodySiteDescription: STRING},Immunization {baseCost: STRING, code: STRING, description: STRING, date: DATE_TIME},Supply {description: STRING, code: STRING, quantity: STRING, date: DATE_TIME},Observation {encounterId: STRING, patientId: STRING, category: STRING, units: STRING, code: STRING, description: STRING, type: STRING, value: STRING, date: DATE_TIME}
+cypher_schema = """Encounter {code: STRING, id: STRING, end: DATE_TIME, reasonCode: STRING, reasonDescription: STRING, isEnd: BOOLEAN, claimCost: FLOAT, coveredAmount: FLOAT, class: STRING, baseCost: FLOAT, date: DATE_TIME, description: STRING},Patient {county: STRING, birthplace: STRING, ethnicity: STRING, maiden: STRING, marital: STRING, race: STRING, firstName: STRING, lastName: STRING, passport: STRING, prefix: STRING, suffix: STRING, SSN: STRING, drivers: STRING, gender: STRING, birthDate: DATE_TIME, city: STRING, state: STRING, address: STRING, healthcareCoverage: FLOAT, income: FLOAT, FIPS: STRING, healthcareExpenses: FLOAT, zip: STRING, id: STRING, deathDate: DATE_TIME},Provider {zip: STRING, encounters: STRING, name: STRING, state: STRING, address: STRING, city: STRING, lat: STRING, lon: STRING, procedures: STRING, gender: STRING, speciality: STRING, id: STRING},Payer {qols_avg: FLOAT, member_months: FLOAT, uncovered_procedures: INTEGER, covered_immunizations: INTEGER, uncovered_immunizations: INTEGER, unique_customers: INTEGER, uncovered_encounters: INTEGER, covered_medications: INTEGER, uncovered_medications: INTEGER, covered_procedures: INTEGER, amount_uncovered: FLOAT, revenue: FLOAT, phone: STRING, amount_covered: FLOAT, covered_encounters: INTEGER, ownership: STRING, state: STRING, zip: STRING, address: STRING, name: STRING, city: STRING, id: STRING},PayerTransition {memberid: STRING},Organization {phone: STRING, revenue: STRING, utilization: STRING, name: STRING, state: STRING, address: STRING, city: STRING, lat: STRING, lon: STRING, id: STRING},Medication {payerCoverage: FLOAT, totalCost: FLOAT, stop: DATE_TIME, reasonDescription: STRING, reasonCode: STRING, code: STRING, start: DATE_TIME, description: STRING, dispenses: INTEGER, baseCost: FLOAT},Condition {code: STRING, start: DATE_TIME, description: STRING, stop: DATE_TIME},CarePlan {encounterId: STRING, patientId: STRING, stop: DATE_TIME, code: STRING, id: STRING, start: DATE_TIME, reasondescription: STRING, description: STRING, reasoncode: STRING},Allergy {description2: STRING, severity2: STRING, code: STRING, severity1: STRING, reaction2: STRING, category: STRING, reaction1: STRING, description1: STRING, system: STRING, type: STRING, description: STRING, start: DATE_TIME, stop: DATE_TIME},Address {address: STRING, location: POINT, city: STRING, state: STRING, zip: STRING, county: STRING, longitude: FLOAT, FIPS: STRING, latitude: FLOAT},Procedure {code: STRING, reasondescription: STRING, start: DATE_TIME, codes: STRING, reasoncode: STRING, basecost: STRING, description: STRING, stop: DATE_TIME},Claim {providerId: STRING, lastBilledDateP: DATE_TIME, lastBilledDate2: DATE_TIME, lastBilledDate1: DATE_TIME, statusP: STRING, healthcareClaimTypeId1: STRING, healthcareClaimTypeId2: STRING, status1: STRING, status2: STRING, supervisingProviderId: STRING, serviceDate: DATE_TIME, outstandingP: STRING, currentIllnessDate: DATE_TIME, outstanding2: STRING, appointmentId: STRING, diagnosis4: STRING, referringProviderId: STRING, departmentId: STRING, outstanding1: STRING, diagnosis1: STRING, diagnosis2: STRING, diagnosis3: STRING, patientId: STRING, id: STRING},ClaimTransaction {unitAmount: FLOAT, transferOutId: STRING, procedureCode: STRING, modifier2: STRING, notes: STRING, placeOfService: STRING, toDate: DATE_TIME, modifier1: STRING, method: STRING, fromDate: DATE_TIME, providerId: STRING, patientId: STRING, units: STRING, chargeId: STRING, amount: FLOAT, id: STRING, transfers: FLOAT, type: STRING, claimId: STRING, adjustments: FLOAT, outstanding: FLOAT, transferType: STRING, payments: FLOAT, lineNote: STRING},Device {udi: STRING, code: STRING, description: STRING, start: DATE_TIME, stop: DATE_TIME},ImagingStudy {encounterId: STRING, patientId: STRING, sopDescription: STRING, sopCode: STRING, instanceUid: STRING, modalityDescription: STRING, procedureCode: STRING, id: STRING, bodySiteCode: STRING, modalityCode: STRING, seriesUid: STRING, date: DATE_TIME, bodySiteDescription: STRING},Immunization {baseCost: STRING, code: STRING, description: STRING, date: DATE_TIME},Supply {description: STRING, code: STRING, quantity: STRING, date: DATE_TIME},Observation {encounterId: STRING, patientId: STRING, category: STRING, units: STRING, code: STRING, description: STRING, type: STRING, value: STRING, date: DATE_TIME}
 Relationship properties are the following:
 INSURANCE_START {ownerName: STRING, planOwnership: STRING, endDate: DATE_TIME, startDate: DATE_TIME, secondaryPayer: STRING}
 The relationships are the following:
@@ -554,7 +545,12 @@ sql_schema = (
                         UNCOVERED_IMMUNIZATIONS INTEGER NOT NULL,
                         UNIQUE_CUSTOMERS INTEGER NOT NULL,
                         QOLS_AVG NUMERIC(10,6) NOT NULL,
-                        MEMBER_MONTHS INTEGER NOT NULL
+                        MEMBER_MONTHS INTEGER NOT NULL,
+                        ADDRESS TEXT,
+                        CITY TEXT,
+                        ZIP INTEGER,
+                        STATE_HEADQUARTERED TEXT,
+                        PHONE VARCHAR(255)
 );
                         """,
     """CREATE TABLE patients (
@@ -562,8 +558,8 @@ sql_schema = (
                             BIRTHDATE DATE NOT NULL,
                             DEATHDATE DATE,
                             SSN VARCHAR(11),
-                            DRIVERS VARCHAR(9),
-                            PASSPORT VARCHAR(9),
+                            DRIVERS VARCHAR(255),
+                            PASSPORT TEXT,
                             PREFIX VARCHAR(4),
                             FIRST VARCHAR(100) NOT NULL,
                             LAST VARCHAR(100) NOT NULL,
@@ -580,8 +576,8 @@ sql_schema = (
                             COUNTY VARCHAR(100) NOT NULL,
                             FIPS NUMERIC,
                             ZIP VARCHAR(10),
-                            LAT NUMERIC(9,6) NOT NULL,
-                            LON NUMERIC(9,6) NOT NULL,
+                            LAT TEXT,
+                            LON TEXT,
                             HEALTHCARE_EXPENSES NUMERIC NOT NULL,
                             HEALTHCARE_COVERAGE NUMERIC NOT NULL,
                             INCOME INTEGER NOT NULL
@@ -615,7 +611,7 @@ sql_schema = (
                             BASE_COST NUMERIC NOT NULL,
                             REASONCODE BIGINT,
                             REASONDESCRIPTION TEXT,
-                            PRIMARY KEY (PATIENT, ENCOUNTER, CODE)
+                            PRIMARY KEY (PATIENT, ENCOUNTER, CODE, START)
                             );
                         """,
     """CREATE TABLE providers (
@@ -630,8 +626,8 @@ sql_schema = (
                             ZIP VARCHAR(10) NOT NULL,
                             LAT NUMERIC(9,6) NOT NULL,
                             LON NUMERIC(9,6) NOT NULL,
-                            ENCOUNTERS UUID REFERENCES encounters(Id),
-                            PROCEDURES UUID 
+                            ENCOUNTERS INTEGER NOT NULL,
+                            PROCEDURES INTEGER NOT NULL
                             );
                         """,
     """CREATE TABLE allergies (
@@ -795,8 +791,7 @@ sql_schema = (
                             DISPENSES INTEGER NOT NULL,
                             TOTALCOST NUMERIC NOT NULL,
                             REASONCODE BIGINT,
-                            REASONDESCRIPTION TEXT,
-                            PRIMARY KEY (PATIENT, ENCOUNTER, CODE)
+                            REASONDESCRIPTION TEXT
                             );
                         """,
     """ CREATE TABLE observations (
@@ -808,8 +803,7 @@ sql_schema = (
                             DESCRIPTION TEXT,
                             VALUE TEXT,
                             UNITS TEXT,
-                            TYPE TEXT,
-                            PRIMARY KEY (PATIENT, ENCOUNTER, CODE)
+                            TYPE TEXT
                             );
                         """,
     """ CREATE TABLE payer_transitions (
@@ -819,9 +813,8 @@ sql_schema = (
                             END_DATE TIMESTAMP WITH TIME ZONE,
                             PAYER UUID REFERENCES payers(Id),
                             SECONDARY_PAYER UUID REFERENCES payers(Id),
-                            PLAN_OWNERSHIP VARCHAR NOT NULL,
-                            OWNER_NAME TEXT NOT NULL,
-                            PRIMARY KEY (PATIENT, MEMBERID, START_DATE)
+                            PLAN_OWNERSHIP VARCHAR,
+                            OWNER_NAME TEXT
                             );
                         """,
     """ CREATE TABLE supplies (
@@ -830,8 +823,7 @@ sql_schema = (
                             ENCOUNTER UUID REFERENCES encounters(Id),
                             CODE BIGINT NOT NULL,
                             DESCRIPTION TEXT NOT NULL,
-                            QUANTITY INTEGER NOT NULL,
-                            PRIMARY KEY (PATIENT, ENCOUNTER, CODE)
+                            QUANTITY INTEGER NOT NULL
                             );
                         """,
     """ CREATE TABLE patient_expenses (
