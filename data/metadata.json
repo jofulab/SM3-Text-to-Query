@@ -49,14 +49,14 @@
   "description": "This dataset contains examples of text-to-query mappings for multiple query languages including SQL, SPARQL, MQL, and Cypher. It includes question type and class information.",
   "conformsTo": "http://mlcommons.org/croissant/1.0",
   "citeAs": "SM3-Text-to-Query Dataset",
-  "url": "https://github.com/jf87/SM3-Text-to-Query",
+  "url": "https://github.com/jofulab/SM3-Text-to-Query",
   "distribution": [
     {
       "@type": "cr:FileObject",
       "@id": "github-repository",
       "name": "github-repository",
       "description": "Repository hosting the SM3-Text-to-Query dataset.",
-      "contentUrl": "https://github.com/jf87/SM3-Text-to-Query",
+      "contentUrl": "https://github.com/jofulab/SM3-Text-to-Query",
       "encodingFormat": "git+https",
       "sha256": "main"
     },
