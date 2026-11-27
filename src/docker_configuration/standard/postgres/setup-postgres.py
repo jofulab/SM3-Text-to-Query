@@ -411,12 +411,6 @@ def load_data(conn, data_path, engine):
                     # change to lower case
                     df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
                     df.columns = [x.lower() for x in df.columns]
-                    if table == "payers":
-                        df = df.loc[:, ~df.columns.str.contains("^Address")]
-                        df = df.loc[:, ~df.columns.str.contains("^City")]
-                        df = df.loc[:, ~df.columns.str.contains("^State_Headquatered")]
-                        df = df.loc[:, ~df.columns.str.contains("^Zip")]
-                        df = df.loc[:, ~df.columns.str.contains("^Phone")]
                     df_1 = df.drop_duplicates()
                     df = df_1
                     table_name = extract_filename(table)

@@ -50,7 +50,6 @@ class LocalServer(object):
             "observations",
             "payer_transitions",
             "supplies",
-            "patient_expenses",
         ]
 
     def check_sm3_database_existence(self):
@@ -116,9 +115,6 @@ class LocalServer(object):
                 elif collection_name == 'payer_transitions':
                     self.import_csv(self.basepath + 'payer_transitions.csv', 'payer_transitions',
                                     self.map_payer_transitions)
-                elif collection_name == 'patient_expenses':
-                    self.import_csv(self.basepath + 'patient_expenses.csv', 'patient_expenses',
-                                    self.map_patient_expenses)
 
             print(f"Created SM3 database: {self.database_name}")
             self.embedding_update()
@@ -178,8 +174,6 @@ class LocalServer(object):
                         self.import_csv(self.basepath + 'claims_transactions.csv', 'claims_transactions', self.map_claims_transactions)
                     elif collection_name == 'payer_transitions':
                         self.import_csv(self.basepath + 'payer_transitions.csv', 'payer_transitions', self.map_payer_transitions)
-                    elif collection_name == 'patient_expenses':
-                        self.import_csv(self.basepath + 'patient_expenses.csv', 'patient_expenses', self.map_patient_expenses)
             else:
                 sm3_database.drop_collection(collection_name)
         self.embedding_update()
@@ -590,30 +584,6 @@ class LocalServer(object):
                 pbar.update(1)
             self.processed += processed
         self.client[f'{self.database_name}'].payer_transitions.drop()
-
-    def embed_patient_expenses_in_patients(self):
-        total_ = self.client[f'{self.database_name}'].patient_expenses.count_documents({})
-        with tqdm(total=total_, desc="Processing patient_expenses",
-                  bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]") as pbar:
-            start_time = time.time()
-            processed = 0
-            for expense in self.client[f'{self.database_name}'].patient_expenses.find():
-                patient_id = expense["PATIENT_REF"]
-                del expense["PATIENT_REF"]  # Remove the "PATIENT" field from the document
-                result = self.client[f'{self.database_name}'].patients.update_one(
-                    {"PATIENT_ID": patient_id},
-                    {"$push": {"EXPENSES": expense}}
-                )
-                # Update progress
-                processed += 1
-                if processed % 100 == 0:  # Log every 100 records
-                    pbar.set_postfix({
-                        "Last Patient": patient_id[:8] + "...",
-                        "Modified": result.modified_count
-                    })
-                pbar.update(1)
-            self.processed += processed
-        self.client[f'{self.database_name}'].patient_expenses.drop()
 
     def run_mongodb_test(self):
         try:
@@ -1027,17 +997,6 @@ class LocalServer(object):
             "UNIQUE_CUSTOMERS": int(row["UNIQUE_CUSTOMERS"]),
             "QOLS_AVG": float(row["QOLS_AVG"]),
             "MEMBER_MONTHS": int(row["MEMBER_MONTHS"])
-        }
-
-    @staticmethod
-    def map_patient_expenses(row):
-        return {
-            "PATIENT_REF": row["PATIENT_ID"],
-            "YEAR": row["YEAR"],
-            "PAYER_REF": row["PAYER_ID"],
-            "HEALTHCARE_EXPENSES": float(row["HEALTHCARE_EXPENSES"]),
-            "INSURANCE_COSTS": float(row["INSURANCE_COSTS"]),
-            "COVERED_COSTS": float(row["COVERED_COSTS"])
         }
 
     def import_csv(self, file_path, collection_name, mapping_func):

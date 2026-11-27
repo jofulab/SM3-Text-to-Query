@@ -91,6 +91,30 @@ See [`data/README.md`](data/README.md) for details. Croissant metadata for the d
 
 See [`src/README.md`](src/README.md) for details.
 
+## Errata and Changes Since the Paper
+
+The code exactly as used for the NeurIPS 2024 paper is tagged
+[`neurips2024`](https://github.com/jofulab/SM3-Text-to-Query/tree/neurips2024). Check out that tag to reproduce the
+reported numbers.
+
+Since then, the prompt schemas in
+[`src/run_experiments/prompts/schemas.py`](src/run_experiments/prompts/schemas.py) have been corrected to match the
+deployed databases. The databases, gold queries, and gold answers are unchanged.
+
+- **SQL** ([#8](https://github.com/jofulab/SM3-Text-to-Query/issues/8)): `sql_schema` now matches the DDL in
+  `setup-postgres.py`. The changes are column types in `patients` and `providers`, the five address columns in
+  `payers`, nullability in `payer_transitions`, and several primary keys.
+- **MQL** ([#9](https://github.com/jofulab/SM3-Text-to-Query/issues/9)): removed `patients.EXPENSES`. The setup
+  never created it, and no gold query uses it. The MongoDB setup now also skips the unused `patient_expenses` collection.
+- **Cypher** ([#10](https://github.com/jofulab/SM3-Text-to-Query/issues/10)): added the missing `Allergy.stop`
+  property, which 40 gold queries use.
+
+Known data limitation ([#7](https://github.com/jofulab/SM3-Text-to-Query/issues/7)): some columns in
+`data/synthea_data` are empty in every row, because Synthea did not populate them in this run. The empty columns are
+`allergies.STOP`, `claims.DIAGNOSIS8` and `REFERRINGPROVIDERID`, `claims_transactions.MODIFIER1`, `MODIFIER2` and
+`LINENOTE`, and the address and phone columns of `payers`. As a result, questions about when an allergy stopped always
+have a NULL answer.
+
 ## Citation
 
 If this repository is useful for your work, we would appreciate it if you cited our paper:
