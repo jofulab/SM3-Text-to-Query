@@ -72,9 +72,28 @@ python src/test_databases.py
 The script runs one query per database and exits with code 0 if all four return the expected result.
 Use the same `SM3_*_PORT` variables if you changed a port.
 
-### 3. Text-to-Query
+### 3. Evaluate your Text-to-Query system
 
-Run your own Text-to-Query system on the train/dev data.
+Train or prompt your system with [`data/train_dev/train.csv`](data/train_dev/train.csv) and generate one query per
+question in [`data/train_dev/dev.csv`](data/train_dev/dev.csv). Save them as a CSV in dev order with the columns
+`question` and `prediction`, then score them by execution accuracy:
+
+```bash
+python src/evaluation/evaluate.py --language sql --predictions my_sql_predictions.csv --out per_question.csv
+```
+
+`--language` is one of `sql`, `cypher`, `sparql`, `mql`. The script runs each predicted and gold query on the
+databases and counts a prediction as correct if both return the same rows (row order, column order and column
+names are ignored). For the unanswerable questions, a prediction starting with "No" (e.g. "No answer possible based
+on given input") is correct. It prints the overall accuracy and the accuracy per question type; `--out` writes
+the per-question results. Gold results are cached in `.sm3_cache/` after the first run.
+
+The raw LLM outputs from our experiments in [`data/results`](data/results) can be scored the same way (their
+`answers` column is parsed with the paper's query-extraction heuristics). Use `--gold-as-prediction` to check your
+setup: the gold queries score 100%.
+
+> Note: the paper compared the string representation of the results. `evaluate.py` compares the results as sets of
+> rows, which is more robust, so its numbers differ somewhat from those in the paper.
 
 ## Data
 

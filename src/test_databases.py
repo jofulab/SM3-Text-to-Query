@@ -16,36 +16,13 @@ Exit codes:
 from __future__ import annotations
 import json
 import os
-import subprocess
 import sys
-import time
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple
 
-# ============================================================================
-# CONFIGURATION (defaults match docker-compose.yml; the port env vars are the same as there)
-# ============================================================================
-
-# PostgreSQL
-POSTGRES_URL = f"postgresql+psycopg://sm3:sm3@localhost:{os.getenv('SM3_POSTGRES_PORT', '5432')}/sm3"
-
-# MongoDB
-MONGO_URI = f"mongodb://sm3:sm3@localhost:{os.getenv('SM3_MONGODB_PORT', '27018')}/sm3?authSource=admin"
-
-# Neo4j
-NEO4J_URI = f"bolt://localhost:{os.getenv('SM3_NEO4J_BOLT_PORT', '7687')}"
-NEO4J_USER = "neo4j"
-NEO4J_PASS = "password"
-
-# GraphDB
-GRAPHDB_HOST = "localhost"
-GRAPHDB_PORT = os.getenv('SM3_GRAPHDB_PORT', '7200')
-GRAPHDB_REPOSITORY = "sm3_graphdb"
-GRAPHDB_USERNAME = "admin"
-GRAPHDB_PASSWORD = "root"
-
-# General settings
-QUERY_TIMEOUT = 120  # seconds
+# Connection settings live in evaluation/executors.py (defaults match docker-compose.yml; override the ports with
+# the same SM3_*_PORT env vars used there)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "evaluation"))
+from executors import get_executor  # noqa: E402
 
 
 # ============================================================================
@@ -78,257 +55,33 @@ def _sorted_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ============================================================================
-# BASE TESTER CLASS
+# TESTER
 # ============================================================================
 
-class DatabaseTester(ABC):
-    """Base class for database testers."""
+class DatabaseTester:
+    """Runs test queries on one database and compares them with the expected rows."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, language: str):
         self.name = name
-
-    @abstractmethod
-    def execute_query(self, query: str) -> Tuple[List[Dict[str, Any]] | str, float]:
-        """
-        Execute a query and return (result_rows | error_string, elapsed_seconds).
-
-        Returns:
-            Tuple of (result, elapsed_time) where result is either:
-            - List[Dict] of row dictionaries on success
-            - str starting with "Error: " on failure
-        """
-        pass
+        self.executor = get_executor(language)
 
     def run_tests(self, tests: List[Dict[str, Any]]) -> Tuple[bool, List[Dict[str, Any]]]:
-        """
-        Run all test queries and compare against expected results.
-
-        Args:
-            tests: List of test dictionaries with 'query' and 'result' keys
-
-        Returns:
-            Tuple of (all_passed, details_list)
-        """
         all_ok = True
         details = []
-
         for i, test in enumerate(tests, start=1):
-            query = test.get("query", "").strip()
-            expected = test.get("result", None)
-
-            # Execute query
-            out, elapsed = self.execute_query(query)
-
-            # Check for execution errors
-            if isinstance(out, str) and out.startswith("Error:"):
-                details.append({
-                    "index": i,
-                    "query": query,
-                    "passed": False,
-                    "note": out,
-                    "elapsed": elapsed,
-                    "expected": expected,
-                    "actual": None,
-                })
-                all_ok = False
-                continue
-
-            # Normalize actual results
-            actual_rows = out  # type: ignore
-            actual_norm = _sorted_rows(_normalize_rows(actual_rows))
-
-            # Handle placeholder for queries without expected results
-            if isinstance(expected, str) and expected.strip() == "<query result>":
-                passed = False
-                note = "No comparison (placeholder '<query result>' found)."
-                expected_norm = None
+            query = test["query"].strip()
+            expected = _sorted_rows(_normalize_rows(test["result"]))
+            res = self.executor.execute(query)
+            if not res.ok:
+                passed, note, actual = False, f"Error: {res.error}", None
             else:
-                # Compare with expected results
-                expected = expected or []
-                if not isinstance(expected, list):
-                    raise ValueError(
-                        f"Query #{i}: 'result' must be a list of dicts or '<query result>'. "
-                        f"Got: {type(expected)}"
-                    )
-                expected_norm = _sorted_rows(_normalize_rows(expected))
-                passed = (actual_norm == expected_norm)
+                actual = _sorted_rows(_normalize_rows(res.rows))
+                passed = actual == expected
                 note = "Matched expected result." if passed else "DIFFERENCE detected."
-
-            details.append({
-                "index": i,
-                "query": query,
-                "passed": passed,
-                "note": note,
-                "elapsed": elapsed,
-                "expected": expected_norm,
-                "actual": actual_norm,
-            })
+            details.append({"index": i, "query": query, "passed": passed, "note": note, "elapsed": res.seconds,
+                            "expected": expected, "actual": actual})
             all_ok = all_ok and passed
-
         return all_ok, details
-
-
-# ============================================================================
-# POSTGRESQL TESTER
-# ============================================================================
-
-class PostgreSQLTester(DatabaseTester):
-    """Tester for PostgreSQL database using SQLAlchemy."""
-
-    def __init__(self):
-        super().__init__("PostgreSQL")
-        self.url = POSTGRES_URL
-
-    def execute_query(self, query: str) -> Tuple[List[Dict[str, Any]] | str, float]:
-        """Execute a SQL query against PostgreSQL."""
-        start = time.time()
-        try:
-            from sqlalchemy import create_engine, text
-
-            engine = create_engine(self.url, future=True)
-            with engine.connect() as conn:
-                result = conn.execute(text(query)).mappings().all()
-                rows = [dict(row) for row in result]
-
-            return rows, time.time() - start
-        except Exception as e:
-            return f"Error: {e}", time.time() - start
-
-
-# ============================================================================
-# MONGODB TESTER
-# ============================================================================
-
-class MongoDBTester(DatabaseTester):
-    """Tester for MongoDB."""
-
-    def __init__(self):
-        super().__init__("MongoDB")
-        self.uri = MONGO_URI
-
-    def execute_query(self, query: str) -> Tuple[List[Dict[str, Any]] | str, float]:
-        """Execute a MongoDB aggregation query."""
-        start = time.time()
-        try:
-            # Wrap query to ensure JSON output
-            eval_code = f"JSON.stringify(({query}).toArray())"
-            cmd = [
-                "docker", "exec", "sm3_mongodb",
-                "mongosh", "mongodb://sm3:sm3@localhost:27017/sm3?authSource=admin",
-                "--quiet",
-                "--eval", eval_code,
-            ]
-
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = proc.communicate(timeout=QUERY_TIMEOUT)
-
-            if proc.returncode != 0 and stderr.strip():
-                return f"Error: {stderr.strip()}", time.time() - start
-            if stderr.strip():
-                return f"Error: {stderr.strip()}", time.time() - start
-
-            # Parse JSON output
-            rows = json.loads(stdout.strip())
-            if not isinstance(rows, list):
-                return "Error: mongosh did not return a JSON array.", time.time() - start
-
-            return rows, time.time() - start
-        except subprocess.TimeoutExpired:
-            return f"Error: Query timeout ({QUERY_TIMEOUT}s)", time.time() - start
-        except json.JSONDecodeError as e:
-            return f"Error: JSON parse error: {e}", time.time() - start
-        except Exception as e:
-            return f"Error: {e}", time.time() - start
-
-
-# ============================================================================
-# NEO4J TESTER
-# ============================================================================
-
-class Neo4jTester(DatabaseTester):
-    """Tester for Neo4j graph database using neo4j Python driver."""
-
-    def __init__(self):
-        super().__init__("Neo4j")
-        self.uri = NEO4J_URI
-        self.user = NEO4J_USER
-        self.password = NEO4J_PASS
-
-    def execute_query(self, query: str) -> Tuple[List[Dict[str, Any]] | str, float]:
-        """Execute a Cypher query against Neo4j."""
-        start = time.time()
-        try:
-            from neo4j import GraphDatabase
-
-            driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
-            with driver, driver.session() as session:
-                result = session.run(query)
-                rows = [rec.data() for rec in result]
-
-            return rows, time.time() - start
-        except Exception as e:
-            return f"Error: {e}", time.time() - start
-
-
-# ============================================================================
-# GRAPHDB TESTER (SPARQL)
-# ============================================================================
-
-class GraphDBTester(DatabaseTester):
-    """Tester for GraphDB using SPARQL queries via HTTP."""
-
-    def __init__(self):
-        super().__init__("GraphDB")
-        self.host = GRAPHDB_HOST
-        self.port = GRAPHDB_PORT
-        self.repository = GRAPHDB_REPOSITORY
-        self.username = GRAPHDB_USERNAME
-        self.password = GRAPHDB_PASSWORD
-
-    def execute_query(self, query: str) -> Tuple[List[Dict[str, Any]] | str, float]:
-        """Execute a SPARQL query against GraphDB."""
-        start = time.time()
-        try:
-            import requests
-
-            url = f"http://{self.host}:{self.port}/repositories/{self.repository}"
-            headers = {"Accept": "application/sparql-results+json"}
-            auth = (self.username, self.password) if self.username else None
-
-            resp = requests.post(
-                url,
-                data={"query": query},
-                headers=headers,
-                auth=auth,
-                timeout=QUERY_TIMEOUT
-            )
-
-            if resp.status_code != 200:
-                return f"Error: HTTP {resp.status_code} - {resp.text.strip()}", time.time() - start
-
-            # Parse SPARQL JSON results
-            data = resp.json()
-            bindings = data.get("results", {}).get("bindings", [])
-
-            rows: List[Dict[str, Any]] = []
-            for binding in bindings:
-                row: Dict[str, Any] = {}
-                for var, cell in binding.items():
-                    row[var] = cell.get("value")
-                rows.append(row)
-
-            return rows, time.time() - start
-        except requests.RequestException as e:
-            return f"Error: {e}", time.time() - start
-        except json.JSONDecodeError as e:
-            return f"Error: JSON decode: {e}", time.time() - start
-        except Exception as e:
-            return f"Error: {e}", time.time() - start
 
 
 # ============================================================================
@@ -467,56 +220,56 @@ def main():
     # Test PostgreSQL
     print_section_header("PostgreSQL Tests")
     try:
-        tester = PostgreSQLTester()
+        tester = DatabaseTester("PostgreSQL", "sql")
         passed, details = tester.run_tests(POSTGRES_TESTS)
         for detail in details:
             print_query_result(detail)
         results["PostgreSQL"] = passed
         all_passed = all_passed and passed
     except Exception as e:
-        print(f"\n✗ Failed to initialize PostgreSQL tester: {e}")
+        print(f"\n✗ Could not connect to PostgreSQL: {e}")
         results["PostgreSQL"] = False
         all_passed = False
 
     # Test MongoDB
     print_section_header("MongoDB Tests")
     try:
-        tester = MongoDBTester()
+        tester = DatabaseTester("MongoDB", "mql")
         passed, details = tester.run_tests(MONGODB_TESTS)
         for detail in details:
             print_query_result(detail)
         results["MongoDB"] = passed
         all_passed = all_passed and passed
     except Exception as e:
-        print(f"\n✗ Failed to initialize MongoDB tester: {e}")
+        print(f"\n✗ Could not connect to MongoDB: {e}")
         results["MongoDB"] = False
         all_passed = False
 
     # Test Neo4j
     print_section_header("Neo4j Tests")
     try:
-        tester = Neo4jTester()
+        tester = DatabaseTester("Neo4j", "cypher")
         passed, details = tester.run_tests(NEO4J_TESTS)
         for detail in details:
             print_query_result(detail)
         results["Neo4j"] = passed
         all_passed = all_passed and passed
     except Exception as e:
-        print(f"\n✗ Failed to initialize Neo4j tester: {e}")
+        print(f"\n✗ Could not connect to Neo4j: {e}")
         results["Neo4j"] = False
         all_passed = False
 
     # Test GraphDB
     print_section_header("GraphDB (SPARQL) Tests")
     try:
-        tester = GraphDBTester()
+        tester = DatabaseTester("GraphDB", "sparql")
         passed, details = tester.run_tests(GRAPHDB_TESTS)
         for detail in details:
             print_query_result(detail)
         results["GraphDB"] = passed
         all_passed = all_passed and passed
     except Exception as e:
-        print(f"\n✗ Failed to initialize GraphDB tester: {e}")
+        print(f"\n✗ Could not connect to GraphDB: {e}")
         results["GraphDB"] = False
         all_passed = False
 
