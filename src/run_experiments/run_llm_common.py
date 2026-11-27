@@ -7,33 +7,53 @@ import requests
 import re
 
 import pandas as pd
-import numpy as np
-import google.generativeai as genai
-import openai
-
-# openai.api_key = os.environ["OPENAI_API_KEY"]
-from openai import OpenAI
-from groq import Groq
 
 import time
 import warnings
+from pathlib import Path
 
 from prompts.bm25 import get_examples, get_examples_from_diverse_template
 
 warnings.filterwarnings("ignore")
 
-
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=GOOGLE_API_KEY)
-
 from prompts.schemas import *
+
+# All paths are relative to the repository, so the scripts can be started from any directory
+REPO_ROOT = Path(__file__).resolve().parents[2]
+TRAIN_DEV_DIR = REPO_ROOT / "data" / "train_dev"
+RESULTS_DIR = REPO_ROOT / "data" / "results"
+
+
+def require_env(name, purpose):
+    value = os.getenv(name)
+    if not value:
+        sys.exit(f"Set the environment variable {name} ({purpose}).")
+    return value
+
+
+def require_package(module, pip_name):
+    try:
+        return __import__(module, fromlist=["_"])
+    except ImportError:
+        sys.exit(f"The package '{pip_name}' is needed for this model: pip install -r requirements-experiments.txt")
+
+
+_openai_client = None
 
 
 def generate_statement_gpt(llm_model, formatted_prompt, retries=10):
-    client = OpenAI(
-        organization="org-0ETBijh97KRCc66SwxdqZYas",
-        project="proj_PkZ1sRwgxenG2CNRjBHMRYPg",
-    )
+    """OpenAI or any OpenAI-compatible endpoint (vLLM, Ollama, ...).
+
+    Uses the standard env vars of the openai package: OPENAI_API_KEY, and optionally OPENAI_BASE_URL,
+    OPENAI_ORG_ID and OPENAI_PROJECT_ID.
+    """
+    global _openai_client
+    openai = require_package("openai", "openai")
+    if _openai_client is None:
+        if not os.getenv("OPENAI_API_KEY") and not os.getenv("OPENAI_BASE_URL"):
+            sys.exit("Set OPENAI_API_KEY (or OPENAI_BASE_URL for a local OpenAI-compatible server).")
+        _openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "not-needed")
+    client = _openai_client
     for attempt in range(retries):
         try:
             start_time = time.time()
@@ -49,6 +69,9 @@ def generate_statement_gpt(llm_model, formatted_prompt, retries=10):
             end_time = time.time()
             elapsed_time = end_time - start_time
             return response.strip(), elapsed_time
+        except (openai.AuthenticationError, openai.PermissionDeniedError, openai.NotFoundError) as e:
+            # Retrying cannot help (wrong key or model name); stop instead of filling the results with errors
+            sys.exit(f"{type(e).__name__} for model {llm_model}: {e}")
         except Exception as e:
             print(f"Error occurred on attempt {attempt + 1}: {e}")
             if attempt == retries - 1:
@@ -57,9 +80,8 @@ def generate_statement_gpt(llm_model, formatted_prompt, retries=10):
 
 
 def generate_statement_groq(llm_model, formatted_prompt, retries=20):
-    client = Groq(
-        api_key=os.environ.get("GROQ_API_KEY"),
-    )
+    groq = require_package("groq", "groq")
+    client = groq.Groq(api_key=require_env("GROQ_API_KEY", "Groq API key"))
 
     for attempt in range(retries):
         try:
@@ -102,7 +124,10 @@ def generate_statement_groq(llm_model, formatted_prompt, retries=20):
 
 
 def generate_statement_gemini(formatted_prompt, retries=100):
-    model = genai.GenerativeModel("gemini-pro")
+    genai = require_package("google.generativeai", "google-generativeai")
+    genai.configure(api_key=require_env("GOOGLE_API_KEY", "Google AI Studio API key"))
+    # The paper used "gemini-pro", which Google has retired; set GEMINI_MODEL to a current model
+    model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-pro"))
     safety_settings = [
         {
             "category": "HARM_CATEGORY_DANGEROUS",
@@ -147,7 +172,8 @@ def generate_statement_gemini(formatted_prompt, retries=100):
 
 
 def generate_statement_llama3_8b(formatted_prompt, retries=10):
-    url = "http://dgx-a100.cloudlab.zhaw.ch:9175/generate"
+    # Text Generation Inference (TGI) server hosting the model, e.g. http://localhost:8080/generate
+    url = require_env("LLAMA_TGI_URL", "URL of the /generate endpoint of a TGI server")
     payload = {"inputs": formatted_prompt, "parameters": {"max_new_tokens": 200}}
     headers = {"Content-Type": "application/json"}
 
@@ -174,7 +200,8 @@ def generate_statement_llama3_8b(formatted_prompt, retries=10):
 
 
 def generate_statement_llama3_70b_local(formatted_prompt, retries=10):
-    url = "http://dgx-a100.cloudlab.zhaw.ch:9175/generate"
+    # Text Generation Inference (TGI) server hosting the model, e.g. http://localhost:8080/generate
+    url = require_env("LLAMA_TGI_URL", "URL of the /generate endpoint of a TGI server")
     payload = {
         "inputs": formatted_prompt,
         "parameters": {"max_new_tokens": 200},
@@ -212,17 +239,18 @@ def run_experiments(
     mql_prompttypes,
     exp_name="",
     bm_shots=5,
+    limit=None,
 ):
-    train_file = "../../data/dataset/train_dev/train.csv"
+    train_file = str(TRAIN_DEV_DIR / "train.csv")
     for llm_model in llm_models:
         print(f"Running experiments for {llm_model}...")
         for dataset in datasets:
             print(f"Running experiments for {dataset}...")
-            file_name = dataset + ".csv"
-            if dataset == "dev" or dataset == "sample_dev":
-                df = pd.read_csv("../../data/dataset/train_dev/" + file_name)
-            if dataset == "test" or dataset == "sample_test":
-                df = pd.read_csv("../../data/dataset/test/" + file_name)
+            if dataset not in ("dev", "sample_dev"):
+                sys.exit(f"Unknown dataset {dataset!r}: use dev or sample_dev (the test set is not released publicly).")
+            df = pd.read_csv(TRAIN_DEV_DIR / f"{dataset}.csv")
+            if limit:
+                df = df.head(limit)
 
             for query_language in query_languages:
                 print(f"Running experiments for {query_language}...")
@@ -244,12 +272,13 @@ def run_experiments(
                 else:
                     print("Invalid query language")
                     sys.exit()
-                output_dir = f"../../data/results/{query_language}/{exp_name}/{dataset}"
+                output_dir = RESULTS_DIR / query_language / exp_name / dataset
                 print(f"Output directory: {output_dir}")
                 os.makedirs(output_dir, exist_ok=True)
                 for prompt_name, prompt_value in prompttypes.items():
-                    csv_file = f"{output_dir}/{dataset}_{query_language}_{prompt_name}_{llm_model}.csv"
-                    progress_file = f"{output_dir}/progress_{dataset}_{query_language}_{prompt_name}_{llm_model}.json"
+                    model_tag = llm_model.replace("/", "_")  # e.g. "meta-llama/Llama-3.1-8B" from a vLLM server
+                    csv_file = f"{output_dir}/{dataset}_{query_language}_{prompt_name}_{model_tag}.csv"
+                    progress_file = f"{output_dir}/progress_{dataset}_{query_language}_{prompt_name}_{model_tag}.json"
 
                     # check if csv file exists, but progress file does not exist
                     if os.path.exists(csv_file) and not os.path.exists(progress_file):
@@ -380,8 +409,11 @@ def run_experiments(
                                 elapsed_time,
                             ) = generate_statement_groq(llm_model, formatted_prompt)
                         else:
-                            print("Invalid LLM model {llm_model}")
-                            sys.exit()
+                            # Any other model name goes to OpenAI or an OpenAI-compatible server (OPENAI_BASE_URL)
+                            (
+                                statement,
+                                elapsed_time,
+                            ) = generate_statement_gpt(llm_model, formatted_prompt)
 
                         # Save the result to the CSV file after each question
                         result_df = pd.DataFrame(
@@ -422,26 +454,35 @@ def main(
     parser.add_argument(
         "--llm_models",
         nargs="+",
-        default=["llama3-8b"],
-        help="List of LLM models (default: ['llama3-8b'])",
+        required=True,
+        help="LLM models. Paper models: gpt-3.5-turbo-0125, gpt-3.5-turbo-0125-batch (OpenAI batch files), "
+        "gemini, llama3-70b-8192 / mixtral-8x7b-32768 / gemma-7b-it (Groq), llama3-8b / llama3-70b-8192-local "
+        "(TGI server). Any other name is sent to OpenAI or the OpenAI-compatible server in OPENAI_BASE_URL.",
     )
     parser.add_argument(
         "--datasets",
         nargs="+",
-        default=["dev", "test"],
-        help="List of datasets (default: ['dev', 'test'])",
+        default=["dev"],
+        choices=["dev", "sample_dev"],
+        help="Datasets (default: dev; the test set is not public)",
     )
     parser.add_argument(
         "--query_languages",
         nargs="+",
         default=["cypher"],
-        help="List of query languages (default: ['cypher'])",
+        choices=["sql", "cypher", "sparql1", "sparql2", "mql"],
+        help="Query languages (default: cypher). sparql1/sparql2 use two different ontology descriptions.",
     )
     parser.add_argument(
         "--bm25_shots",
         type=int,
         default=0,
-        help="Number of BM25 shots (default: 1)",
+        help="Number of BM25-retrieved examples for the *_bm25 prompts (default: 0)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Only use the first N questions (for a quick or cheap test run)",
     )
 
     args = parser.parse_args()
@@ -450,6 +491,7 @@ def main(
     datasets = args.datasets
     query_languages = args.query_languages
     bm_shots = args.bm25_shots
+    limit = args.limit
 
     print("LLM Models:", llm_models)
     print("Datasets:", datasets)
@@ -466,4 +508,5 @@ def main(
         mql_prompttypes,
         exp_name=exp_name,
         bm_shots=bm_shots,
+        limit=limit,
     )
