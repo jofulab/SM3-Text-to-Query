@@ -95,6 +95,18 @@ setup: the gold queries score 100%.
 > Note: the paper compared the string representation of the results. `evaluate.py` compares the results as sets of
 > rows, which is more robust, so its numbers differ somewhat from those in the paper.
 
+### 4. Optional: re-run the paper experiments
+
+The prompting experiments from the paper (zero-/one-/few-shot, with and without schema, BM25-retrieved examples)
+can be re-run with OpenAI, Gemini, Groq, or any OpenAI-compatible server such as vLLM or Ollama:
+
+```bash
+pip install -r requirements-experiments.txt
+python src/run_experiments/run_llm_exp1.py --llm_models gpt-4o-mini --query_languages sql --limit 20
+```
+
+See [`src/run_experiments/README.md`](src/run_experiments/README.md) for the experiments, models and settings.
+
 ## Data
 
 - `./data/synthea_data` contains the Synthea data used as the basis for PostgreSQL, GraphDB (RDF), Neo4j, and MongoDB.
@@ -111,13 +123,14 @@ See [`data/README.md`](data/README.md) for details. Croissant metadata for the d
 
 ## Code
 
-- `./src/setup_dbs` contains the loaders (one per database, each with its Dockerfile) that set up the four database systems (PostgreSQL, GraphDB,
-  Neo4j, and MongoDB) and populate them with Synthea data.
-- `./src/run_experiments` contains the code to replicate our experiments for all database models, LLMs, prompts, and
-  few-shot sampling (repetitions).
-- `./src/evaluation` contains the code to evaluate the results obtained by the LLMs for our four databases, including
-  the necessary data-cleaning logic. It computes Execution Accuracy (EA) and Valid Efficiency Score (VES) for each
-  combination of LLM, database model, and prompt setting.
+- `./docker-compose.yml` starts the four databases and their loaders.
+- `./src/setup_dbs` contains the loaders (one per database, each with its Dockerfile) that set up the four database
+  systems and populate them with the Synthea data.
+- `./src/test_databases.py` checks that all four databases are up and loaded.
+- `./src/evaluation` contains `evaluate.py`, which scores predicted queries by execution accuracy.
+- `./src/run_experiments` contains the code to re-run our LLM experiments for all query languages, prompts, and
+  few-shot samples.
+- `./archive` contains the original evaluation pipeline and analysis notebooks of the paper (not maintained).
 
 See [`src/README.md`](src/README.md) for details.
 
@@ -138,6 +151,11 @@ deployed databases. The databases, gold queries, and gold answers are unchanged.
   never created it, and no gold query uses it. The MongoDB setup now also skips the unused `patient_expenses` collection.
 - **Cypher** ([#10](https://github.com/jofulab/SM3-Text-to-Query/issues/10)): added the missing `Allergy.stop`
   property, which 40 gold queries use.
+
+The infrastructure was also reworked so that the benchmark can be set up and used without manual steps: the
+databases are loaded by `docker compose` (GraphDB from the same `data/synthea_ttl.zip` as before),
+[`src/evaluation/evaluate.py`](src/evaluation/evaluate.py) replaces the original evaluation scripts (now in
+[`archive/`](archive)), and the experiment scripts run without the original lab infrastructure.
 
 Known data limitation ([#7](https://github.com/jofulab/SM3-Text-to-Query/issues/7)): some columns in
 `data/synthea_data` are empty in every row, because Synthea did not populate them in this run. The empty columns are
