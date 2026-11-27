@@ -1,0 +1,6 @@
+neo4j==6.4.1
+PyYAML==6.0.4
+pandas==2.2.3
+boto3==1.44.12
+smart-open==10.0.0
+ijson==3.6.0

@@ -15,6 +15,7 @@ Exit codes:
 
 from __future__ import annotations
 import json
+import os
 import subprocess
 import sys
 import time
@@ -22,23 +23,23 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple, Optional
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION (defaults match docker-compose.yml; the port env vars are the same as there)
 # ============================================================================
 
 # PostgreSQL
-POSTGRES_URL = "postgresql+psycopg://sm3:sm3@localhost:5432/sm3"
+POSTGRES_URL = f"postgresql+psycopg://sm3:sm3@localhost:{os.getenv('SM3_POSTGRES_PORT', '5432')}/sm3"
 
 # MongoDB
-MONGO_URI = "mongodb://sm3:sm3@localhost:27018/sm3?authSource=admin"
+MONGO_URI = f"mongodb://sm3:sm3@localhost:{os.getenv('SM3_MONGODB_PORT', '27018')}/sm3?authSource=admin"
 
 # Neo4j
-NEO4J_URI = "bolt://localhost:7687"
+NEO4J_URI = f"bolt://localhost:{os.getenv('SM3_NEO4J_BOLT_PORT', '7687')}"
 NEO4J_USER = "neo4j"
 NEO4J_PASS = "password"
 
 # GraphDB
 GRAPHDB_HOST = "localhost"
-GRAPHDB_PORT = "7200"
+GRAPHDB_PORT = os.getenv('SM3_GRAPHDB_PORT', '7200')
 GRAPHDB_REPOSITORY = "sm3_graphdb"
 GRAPHDB_USERNAME = "admin"
 GRAPHDB_PASSWORD = "root"

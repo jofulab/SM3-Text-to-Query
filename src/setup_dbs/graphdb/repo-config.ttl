@@ -10,7 +10,7 @@
 @prefix syn: <https://knacc.umbc.edu/dae-young/kim/ontologies/synthea#> .
 
 [] a rep:Repository ;
-    rep:repositoryID "sm3" ;
+    rep:repositoryID "sm3_graphdb" ;
     rdfs:label "SM3 Repository" ;
     rep:repositoryImpl [
         rep:repositoryType "graphdb:SailRepository" ;
@@ -38,10 +38,6 @@
             graphdb:throw-QueryEvaluationException-on-timeout "false" ;
             graphdb:query-limit-results "0" ;
 
-            # Settable in the file but otherwise hidden in the UI and in the RDF4J console
-            graphdb:base-URL "http://example.org/owlim#" ;
-            graphdb:defaultNS "https://knacc.umbc.edu/dae-young/kim/ontologies/synthea#" ;
-            graphdb:imports "/Users/workstation/Documents/GitHub/SM3-Text-to-Query-fork/src/setup_dbs/graphdb/synthea-rdf-converter-fork/temporary_ttl_files/allergy.ttl";
             graphdb:repository-type "file-repository" ;
             graphdb:storage-folder "storage" ;
             graphdb:entity-index-size "10000000" ;

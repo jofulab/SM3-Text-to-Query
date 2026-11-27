@@ -439,11 +439,24 @@ def run_db_test(conn):
             cursor.execute(query)
             results = cursor.fetchall()
             print(results)
-            if results[0] == ('Glendora96', 'Tillman293'):
-                print("Test passed")
-            else:
-                print("Test failed")
+            passed = results == [('Glendora96', 'Tillman293')]
+            print("Test passed" if passed else "Test failed")
     conn.commit()
+    return passed
+
+def wait_for_db(db_params, max_retries=60, delay_seconds=2):
+    for attempt in range(max_retries):
+        try:
+            conn = psycopg2.connect(**db_params)
+            conn.close()
+            print("Successfully connected to the postgresql sm3 database")
+            return True
+        except psycopg2.OperationalError as e:
+            print(f"Attempt {attempt + 1}/{max_retries} to connect to the postgresql sm3 database failed")
+            print(f"Error: {e}")
+            time.sleep(delay_seconds)
+
+    raise Exception("Could not connect to the postgresql sm3 database after 60 maximum retries")
 
 
 def main():
@@ -451,7 +464,7 @@ def main():
         description="Setup script for PostgreSQL connection."
     )
     parser.add_argument(
-        "--db-host", default=os.getenv("DB_HOST", "localhost"), help="Database host"
+        "--db-host", default=os.getenv("DB_HOST", "sm3_postgres"), help="Database host"
     )
     parser.add_argument(
         "--db-port", default=os.getenv("DB_PORT", "5432"), help="Database port"
@@ -461,7 +474,7 @@ def main():
     )
     parser.add_argument(
         "--db-password",
-        default=os.getenv("DB_PASSWORD", ""),
+        default=os.getenv("DB_PASSWORD", "sm3"),
         help="Database password)",
     )
     parser.add_argument(
@@ -470,7 +483,7 @@ def main():
 
     parser.add_argument(
         "--synthea-data",
-        default=os.getenv("SYNTHEA_DATA", "../../../data/synthea_data"),
+        default=os.getenv("SYNTHEA_DATA", "/app/data"),
         help="Synthea data folder",
     )
     args = parser.parse_args()
@@ -481,6 +494,18 @@ def main():
     db_password = args.db_password
     db_name = args.db_name
     data_path = args.synthea_data
+
+    # wait for database to be ready:
+    max_retries = 60
+    delay_seconds = 1
+    db_params = {
+        "dbname": db_name,
+        "user": db_user,
+        "password": db_password,
+        "host": db_host,
+        "port": int(db_port)
+    }
+    wait_for_db(db_params)
 
     # Database connection
     conn = psycopg2.connect(
@@ -501,12 +526,13 @@ def main():
         load_data(conn, data_path, engine)
         print("Database setup completed successfully")
         print("Testing setup")
-        run_db_test(conn)
+        passed = run_db_test(conn)
     except Exception as e:
         print(f"Error during database setup: {e}")
         raise
     finally:
         conn.close()
+    raise SystemExit(0 if passed else 1)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,18 @@
-server_uri: bolt://localhost:7687/
+# Connection defaults for docker compose. Override with the env vars NEO4J_URI, NEO4J_USER,
+# NEO4J_PASSWORD and SYNTHEA_DATA (folder with the Synthea CSVs, substituted for $BASE below).
+server_uri: bolt://sm3_neo4j:7687/
 admin_user: neo4j
 admin_pass: password
-database: SM3
+basepath: /app/data
+# The community edition only has the default database
+database: neo4j
 
 files:
 # payers
-  - url: ../../../data/synthea_data/payers.csv
+  - url: $BASE/payers.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MERGE (p:Payer {id:row.Id})
@@ -34,9 +39,10 @@ files:
               p.member_months = toFloat(row.MEMBER_MONTHS)
 
 # encounters
-  - url: ../../../data/synthea_data/encounters.csv
+  - url: $BASE/encounters.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MERGE (e:Encounter {id:row.Id})
@@ -73,9 +79,10 @@ files:
         )
   
 # providers
-  - url: ../../../data/synthea_data/providers.csv
+  - url: $BASE/providers.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MERGE (p:Provider {id: row.Id})
@@ -95,9 +102,10 @@ files:
       MERGE (o)-[:IS_PERFORMED_AT]-(p)
 
 # patients
-  - url: ../../../data/synthea_data/patients.csv
+  - url: $BASE/patients.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MERGE (p:Patient {id:row.Id})
@@ -128,9 +136,10 @@ files:
             p.income=toFloat(row.INCOME)
 
 # payer transitions
-  - url: ../../../data/synthea_data/payer_transitions.csv
+  - url: $BASE/payer_transitions.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id:row.PATIENT})
@@ -149,9 +158,10 @@ files:
 
 
 # allergies
-  - url: ../../../data/synthea_data/allergies.csv
+  - url: $BASE/allergies.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -176,9 +186,10 @@ files:
       MERGE (a)-[:IS_DIAGNOSED_DURING]->(en)
 
 # conditions
-  - url: ../../../data/synthea_data/conditions.csv
+  - url: $BASE/conditions.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -193,9 +204,10 @@ files:
       MERGE (c)-[:IS_DIAGNOSED_DURING]->(en)
 
 # medications
-  - url: ../../../data/synthea_data/medications.csv
+  - url: $BASE/medications.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -219,9 +231,10 @@ files:
       MERGE (m)-[:IS_PRESCRIBED_DURING]->(e)
 
 # procedures
-  - url: ../../../data/synthea_data/procedures.csv
+  - url: $BASE/procedures.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
           MATCH (p:Patient {id:row.PATIENT})
@@ -241,9 +254,10 @@ files:
 
 
 # observations
-  - url: ../../../data/synthea_data/observations.csv
+  - url: $BASE/observations.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -264,9 +278,10 @@ files:
       MERGE (o)-[:HAS_ORDERED]->(e)
 
 # care plans
-  - url: ../../../data/synthea_data/careplans.csv
+  - url: $BASE/careplans.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
           MATCH (p:Patient {id:row.PATIENT})
@@ -289,9 +304,10 @@ files:
           MERGE (c)-[:HAS_ORDERED]->(e)
 
 # organizations
-  - url: ../../../data/synthea_data/organizations.csv
+  - url: $BASE/organizations.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MERGE (o:Organization {id:row.Id})
@@ -307,9 +323,10 @@ files:
             o.id = row.Id
 
 # claims
-  - url: ../../../data/synthea_data/claims.csv
+  - url: $BASE/claims.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MATCH (p:Patient {id: row.PATIENTID})
@@ -345,9 +362,10 @@ files:
         MERGE (c)-[:IS_FILED_BY]->(pr)
 
 # claims transaction
-  - url: ../../../data/synthea_data/claims_transactions.csv
+  - url: $BASE/claims_transactions.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
         MATCH (c:Claim {id: row.CLAIMID})
@@ -387,9 +405,10 @@ files:
 
 
 # devices
-  - url: ../../../data/synthea_data/devices.csv
+  - url: $BASE/devices.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -406,9 +425,10 @@ files:
       MERGE (d)-[:HAS_MEASURED]->(p)
 
 # imaging studies
-  - url: ../../../data/synthea_data/imaging_studies.csv
+  - url: $BASE/imaging_studies.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -432,9 +452,10 @@ files:
       MERGE (i)-[:IS_ORDERED_DURING]->(e)
 
 # immunization
-  - url: ../../../data/synthea_data/immunizations.csv
+  - url: $BASE/immunizations.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -450,9 +471,10 @@ files:
       MERGE (i)-[:IS_PRESCRIBED_DURING]->(e)
 
 # supply
-  - url: ../../../data/synthea_data/supplies.csv
+  - url: $BASE/supplies.csv
     compression: none
     skip_file: false
+    chunk_size: 1000
     cql: |
       WITH $dict.rows as rows UNWIND rows as row
       MATCH (p:Patient {id: row.PATIENT})
@@ -468,9 +490,10 @@ files:
       MERGE (s)-[:IS_ORDERED_DURING]->(e)
 
   # patient expenses
-  #- url: ../../../data/synthea_data/patient_expenses.csv
+  #- url: $BASE/patient_expenses.csv
     #compression: none
     #skip_file: false
+    #
     #cql: |
       #WITH $dict.rows as rows UNWIND rows as row
       #MATCH (p:Patient {id: row.PATIENT_ID})
@@ -487,24 +510,24 @@ files:
 
 
 pre_ingest:
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Encounter) ON (n.date)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Encounter) ON (n.isEnd)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Patient) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Provider) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Payer) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:PayerTransition) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Organization) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Medication) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Condition) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:CarePlan) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Allergy) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Procedure) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Claim) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:ClaimTransaction) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Device) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:ImagingStudy) ON (n.id)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Immunization) ON (n.code)
-  - CREATE INDEX FOR IF NOT EXISTS FOR (n:Supply) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Encounter) ON (n.date)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Encounter) ON (n.isEnd)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Patient) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Provider) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Payer) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:PayerTransition) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Organization) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Medication) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Condition) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:CarePlan) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Allergy) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Procedure) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Claim) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:ClaimTransaction) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Device) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:ImagingStudy) ON (n.id)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Immunization) ON (n.code)
+  - CREATE INDEX IF NOT EXISTS FOR (n:Supply) ON (n.code)
 
 
 post_ingest:

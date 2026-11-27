@@ -1,4 +1,0 @@
-server_uri: http://sm3-graphdb:7200
-repository: sm3
-username: "admin"
-password: "root"

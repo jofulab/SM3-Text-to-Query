@@ -1,33 +1,8 @@
-# Postgres dependencies
-psycopg[binary]
-sqlalchemy>=2.0.44
-
-# Neo4j dependencies
-neo4j
-
-# Mongo db dependencies
-pymongo
-
-# graph db
-synthea-rdf
-pathlib
-rdflib>=6.3.2
-rdflib-jsonld>=0.6.2
-requests.auth
-
-# Jupyter
-notebook>=7.4
-jupyterlab
-ipython>=9.5
-ipykernel>=6.30
-pandas
-
-
-# LLMs
-google-generativeai
-pandas
-requests
-openai
-groq
-vertexai
-google.cloud
+# Host-side dependencies for src/test_databases.py and the evaluation tool.
+# (The database loaders run in Docker and have their own requirements in src/setup_dbs/<db>/.)
+# Tested with Python 3.15: pandas 2.3.3, SQLAlchemy 2.0.58, psycopg 3.3.9, neo4j 6.4.1, requests 2.34.2
+pandas>=2.2,<3
+SQLAlchemy>=2.0,<2.1
+psycopg[binary]>=3.1
+neo4j>=5.20
+requests>=2.31
