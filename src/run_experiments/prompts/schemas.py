@@ -1,3 +1,5 @@
+import os
+
 mql_schema = {
     "patients": {
         "PATIENT_ID": "<UUID>",
@@ -303,7 +305,8 @@ def read_ttl_file(file_path):
         return file.read()
 
 
-schema_file = "prompts/synthea_ontology1.ttl"  # shorter ontology
+# shorter ontology, next to this file (so the scripts can be run from any directory)
+schema_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synthea_ontology1.ttl")
 sparql1_schema = read_ttl_file(schema_file)
 
 sparql2_schema_depricated = """

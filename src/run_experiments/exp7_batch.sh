@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Define arrays for your parameters
-datasets=("test" "dev")
+# Creates OpenAI batch request files (.jsonl) for experiment 7; upload them with upload_batch.py
+cd "$(dirname "$0")"
+datasets=("dev")
 query_languages=("sql" "mql" "cypher" "sparql1" "sparql2")
 
 # Loop through each dataset

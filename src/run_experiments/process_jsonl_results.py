@@ -1,7 +1,10 @@
+"""Write the responses of finished OpenAI batch jobs (downloaded .jsonl output files) into the result CSVs."""
 import os
 import sys
 import json
 import csv
+
+RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "results")
 
 def process_jsonl_file(file_path):
     with open(file_path, 'r') as jsonl_file:
@@ -21,8 +24,7 @@ def process_jsonl_file(file_path):
             index = parts[-1]
             
             # Construct the folder path
-            # folder_path = f"{exp_name}_LLM_output_{query_language}_{dataset}"
-            folder_path = f"../../data/results/{query_language}/{exp_name}/{dataset}"
+            folder_path = os.path.join(RESULTS_DIR, query_language, exp_name, dataset)
             
             # Construct the CSV file path
             csv_file_name = f"{dataset}_{query_language}_{prompt_name}_{llm_model}.csv"
