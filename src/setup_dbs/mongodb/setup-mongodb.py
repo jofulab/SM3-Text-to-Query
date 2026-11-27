@@ -127,6 +127,8 @@ class LocalServer(object):
     def create_sm3_collections_corrected(self):
         # get all the collections associated to the sm3 database
         sm3_database = self.client[f'{self.database_name}']
+        # import_csv() writes through self.database, so point it at the database object
+        self.database = sm3_database
         list_collection_names = sm3_database.list_collection_names()
         # Insert regular data
         for collection_name in list_collection_names:
@@ -136,7 +138,7 @@ class LocalServer(object):
                 if not current_collection.count_documents({}) > 0:
                     # No entries defined hence definition of collection as new
                     # Drop current version and import most up to date data
-                    self.database.drop_collection()
+                    sm3_database.drop_collection(collection_name)
                     # Distinction of the different collections:
                     if collection_name == 'patients':
                         self.import_csv(self.basepath + 'patients.csv', 'patients', self.map_patients)
