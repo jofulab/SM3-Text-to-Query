@@ -6,12 +6,14 @@ import yaml
 
 
 def main():
-    with open("configuration.yaml", "r") as file:
+    # Paths in configuration.yaml are relative to this folder; SYNTHEA_DATA overrides the CSV folder
+    here = Path(__file__).resolve().parent
+    with open(here / "configuration.yaml", "r") as file:
         config = yaml.safe_load(file)
 
-    model_path = Path(config["model_path"]).resolve()
-    synthea_csv_path = Path(config["synthea_csv_path"]).resolve()
-    output_path = Path(config["output_path"]).resolve()
+    model_path = (here / config["model_path"]).resolve()
+    synthea_csv_path = Path(os.getenv("SYNTHEA_DATA", here / config["synthea_csv_path"])).resolve()
+    output_path = (here / config["output_path"]).resolve()
     chunk_size = config["chunk_size"]
     include_dua = config["include_dua"]
     include_trustscore = config["include_trustscore"]

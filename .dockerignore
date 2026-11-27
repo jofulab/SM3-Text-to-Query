@@ -1,0 +1,5 @@
+# The build context is the repo root; only src/setup_dbs is copied into the images. Data is mounted at runtime.
+*
+!src/setup_dbs/
+src/setup_dbs/graphdb/synthea-rdf-converter-fork/temporary_ttl_files/*.ttl
+**/__pycache__

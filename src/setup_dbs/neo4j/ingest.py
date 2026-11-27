@@ -13,7 +13,7 @@ import pathlib
 import ijson
 # additional
 import logging
-import subprocess
+import os
 import time
 """
 This code is adapted from the pyingest library
@@ -47,20 +47,18 @@ class LocalServer(object):
                                             auth=(config['admin_user'],
                                                   config['admin_pass']))
         self.db_config={}
-        self.database = config['database'] if 'database' in config else None
+        self.database = config['database'] if 'database' in config else 'neo4j'
         if self.database is not None:
             self.db_config['database'] = self.database
-        self.basepath = config['basepath'] if 'basepath' in config else None
+        self.basepath = config['basepath']
 
-    # Helper function checking the existence of a SM3 database
+    # Helper function checking the existence of the target database
     def check_sm3_database_existence(self):
         try:
             with self._driver.session(database="system") as session:
                 result = session.run("SHOW DATABASES")
                 existing_databases = [record["name"] for record in result]
-                #lowercase_database_name = str(self.database).lower()
-                lowercase_database_name = 'sm3'
-                return lowercase_database_name in existing_databases
+                return self.database in existing_databases
         except Exception as e:
             print(f"Error checking the SM3 Neo4j database existence: {str(e)}")
             return False
@@ -96,26 +94,21 @@ class LocalServer(object):
                     MATCH (o:Organization {name: 'ROYAL OF FAIRHAVEN NURSING CENTER'})- [:IS_PERFOMED_AT]->(e:Encounter)<-[:HAS_ENCOUNTER]-(p:Patient) 
                     RETURN DISTINCT p.firstName, p.lastName
                 """]
+        expected = [('Glendora96', 'Tillman293')]
         try:
-            with self._driver.session(database="sm3") as session:
-                for i, query in enumerate(neo4j_test_query, 1):
+            with self._driver.session(**self.db_config) as session:
+                for query in neo4j_test_query:
                     print("Query:", query)
-                    print("Query result:")
-                    results = session.run(query)
-                    records = list(results)
-                    for record in records:
-                        record_tuple = (record['p.firstName'],record['p.lastName'])
-                        expected_tuple = ('Glendora96', 'Tillman293')
-                        # showing the tuple solution
-                        print(f"Record from database as tuple: {record_tuple}")
-                        print(f"Expected from database as tuple: {expected_tuple}")
-
-                        if record_tuple == expected_tuple:
-                            print("Test passed")
-                        else:
-                            print("Test failed")
+                    records = [(r['p.firstName'], r['p.lastName']) for r in session.run(query)]
+                    print(f"Query result: {records}")
+                    if records == expected:
+                        print("Test passed")
+                        return True
+                    print(f"Test failed, expected {expected}")
+                    return False
         except Exception as e:
-            print(f"Error running test queries :{e}")
+            print(f"Error running test queries: {e}")
+            return False
 
     def close(self):
         self._driver.close()
@@ -128,7 +121,7 @@ class LocalServer(object):
             print("Skipping this file: {}", file['url'])
             return
 
-        print("{} : Reading file", datetime.datetime.utcnow())
+        print("{} : Reading file", datetime.datetime.now(datetime.timezone.utc))
 
         # If file type is specified, use that.  Else check the extension.  Else, treat as csv
         type = file.get('type') or 'NA'
@@ -177,18 +170,18 @@ class LocalServer(object):
                     if rec_num > params['skip_records']:
                         rows.append(row)
                         if len(rows) == params['chunk_size']:
-                            print(file['url'], chunk_num, datetime.datetime.utcnow(), flush=True)
+                            print(file['url'], chunk_num, datetime.datetime.now(datetime.timezone.utc), flush=True)
                             chunk_num = chunk_num + 1
                             rows_dict = {'rows': rows}
                             session.run(params['cql'], dict=rows_dict).consume()
                             rows = []
 
             if len(rows) > 0:
-                print(file['url'], chunk_num, datetime.datetime.utcnow(), flush=True)
+                print(file['url'], chunk_num, datetime.datetime.now(datetime.timezone.utc), flush=True)
                 rows_dict = {'rows': rows}
                 session.run(params['cql'], dict=rows_dict).consume()
 
-        print("{} : Completed file", datetime.datetime.utcnow())
+        print("{} : Completed file", datetime.datetime.now(datetime.timezone.utc))
 
     def get_params(self, file):
         params = dict()
@@ -229,13 +222,13 @@ class LocalServer(object):
                                      chunksize=params['chunk_size'])
 
             for i, rows in enumerate(row_chunks):
-                print(params['url'], i, datetime.datetime.utcnow(), flush=True)
+                print(params['url'], i, datetime.datetime.now(datetime.timezone.utc), flush=True)
                 # Chunk up the rows to enable additional fastness :-)
                 rows_dict = {'rows': rows.fillna(value="").to_dict('records')}
                 session.run(params['cql'],
                             dict=rows_dict).consume()
 
-        print("{} : Completed file", datetime.datetime.utcnow())
+        print("{} : Completed file", datetime.datetime.now(datetime.timezone.utc))
 
     def pre_ingest(self):
         if 'pre_ingest' in config:
@@ -282,50 +275,63 @@ def get_s3_client():
 
 
 def load_config(configuration):
+    """Load the YAML config; connection settings and the data folder can be overridden via env vars."""
     global config
     with open(configuration) as config_file:
         config = yaml.load(config_file, yaml.SafeLoader)
+    config['server_uri'] = os.getenv('NEO4J_URI', config.get('server_uri', 'bolt://localhost:7687'))
+    config['admin_user'] = os.getenv('NEO4J_USER', config.get('admin_user', 'neo4j'))
+    config['admin_pass'] = os.getenv('NEO4J_PASSWORD', config.get('admin_pass', 'password'))
+    config['basepath'] = os.getenv('SYNTHEA_DATA', config.get('basepath', '/app/data'))
 
+
+def wait_for_db(max_retries=60, delay_seconds=2):
+    for attempt in range(max_retries):
+        driver = None
+        try:
+            driver = GraphDatabase.driver(config['server_uri'],
+                                          auth=(config['admin_user'], config['admin_pass']))
+            driver.verify_connectivity()
+            print(f"Successfully connected to Neo4j at {config['server_uri']}")
+            return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries} to connect to Neo4j at {config['server_uri']} failed: {e}")
+            time.sleep(delay_seconds)
+        finally:
+            if driver:
+                driver.close()
+    return False
 
 
 def main():
-    # Definition of location of the configuration file
-    configuration = 'config_neo4j.yml'
-
-    # Load the respective configuration file
+    # The config file sits next to this script (also inside the container)
+    configuration = os.getenv('NEO4J_CONFIG', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config_neo4j.yml'))
     load_config(configuration)
-    server = LocalServer()
-    #configuration = sys.argv[1]
+    if not wait_for_db():
+        logger.error("Failed to connect to database")
+        raise SystemExit(1)
 
-    if server.check_sm3_database_existence():
-        if server.check_sm3_data_existence():
-            print("SM3 data and database already exists in database. Import skipped.")
-            server.run_db_test()
-            server.close()
-            return
-        # In the case data has not been loaded, the code below for the loading and saving of data is executed
-    else:
-        #print(server.check_sm3_database_existence())
-        if not server.create_sm3_neo4j_database():
-            print(f"Failed to create database {server.database}")
-            server.close()
-            return
-    # Wait for 3s SM3 to be available
-    time.sleep(3)
-    server.close()
+    # The Neo4j community edition only provides the default database ("neo4j"), so we load into that one.
     server = LocalServer()
-    if server.check_sm3_database_existence():
-        # Loading of indexes and loafing of data
+    if not server.check_sm3_database_existence():
+        logger.error(f"Database {server.database} does not exist")
+        server.close()
+        raise SystemExit(1)
+
+    # Neo4j data is persisted in ./neo4j/data, so skip the import on a re-run instead of duplicating all nodes.
+    if server.check_sm3_data_existence():
+        print("SM3 data already exists in Neo4j. Import skipped.")
+    else:
         server.pre_ingest()
-        file_list = config['files']
-        for file in file_list:
-            #print(file)
+        for file in config['files']:
             server.load_file(file)
         server.post_ingest()
-
         print("Data has been inserted into Neo4j database")
-    server.run_db_test()
+
+    passed = server.run_db_test()
     server.close()
+    raise SystemExit(0 if passed else 1)
+
 
 if __name__ == "__main__":
     main()

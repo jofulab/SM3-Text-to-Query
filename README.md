@@ -28,38 +28,49 @@ synthetic patient data from [Synthea](https://github.com/synthetichealth/synthea
 
 ## Getting Started
 
-### 1. Setup DBs
+### 1. Set up the databases
 
-The first step is to deploy the four database systems (PostgreSQL, MongoDB, Neo4j and GraphDB) and load and transform
-the synthetic patient data that has been generated through [Synthea](https://github.com/synthetichealth/synthea).
-For convenience, we provide a docker-compose file:
+Requirements: Docker with Docker Compose, and about 8 GB of memory available to Docker.
 
-`docker compose up -d` will take care of deploying the docker container for the four databases, loading and transforming
-the data.
+```bash
+docker compose up -d --build
+```
 
-> Note: Use `docker compose down` to stop the containers again. Using `docker stop container_name` might leave some
-> ports blocked and prevent containers from starting properly again on some systems.
+This starts PostgreSQL, MongoDB, Neo4j and GraphDB, plus one loader container per database. Each loader imports
+the Synthea data from [`data/`](data), runs a small self-test and exits. Loading takes about 15 minutes in
+total (measured on a laptop with 8 GB for Docker); MongoDB is the slowest. Check progress with:
 
-**Repository Setup (mandatory):**
+```bash
+docker compose ps -a          # all four *_loader containers should end with "Exited (0)"
+docker compose logs -f mongodb_loader
+```
 
-Create GraphDB repository named "sm3_graphdb" by entering the GraphDB GUI on a Browser via http://localhost:7200
+| Database   | Host port      | User / password | Database / repository |
+|------------|----------------|-----------------|-----------------------|
+| PostgreSQL | 5432           | sm3 / sm3       | `sm3`                 |
+| MongoDB    | 27018          | sm3 / sm3       | `sm3` (authSource `admin`) |
+| Neo4j      | 7687 (browser: 7474) | neo4j / password | `neo4j`          |
+| GraphDB    | 7200           | admin / root    | `sm3_graphdb`         |
 
-In the menu on the left, navigate to `Setup` and then `Repositories`. There, create a new repository and select
-`GraphDB Repository`. Make sure to give it the name `sm3_graphdb` and leave the other settings on default.
-Once it has been created, select the new repository with `Choose repository` in the top right corner.
+If a port is already in use, set `SM3_POSTGRES_PORT`, `SM3_MONGODB_PORT`, `SM3_NEO4J_BOLT_PORT`,
+`SM3_NEO4J_HTTP_PORT` or `SM3_GRAPHDB_PORT`, e.g. `SM3_POSTGRES_PORT=15432 docker compose up -d`.
 
-If you haven't already, decompress (unzip) the [synthea_ttl.zip](data/synthea_ttl.zip) file in this git repo.
-In the UI again, navigate to `Import` and select `Upload RDF files` and upload the `.ttl` files from that zip archive.
-Then mark all of them and import them into GraphDB. The import can take a while depending on your system.
+The data is kept in Docker volumes: `docker compose down` stops everything, and the next `up` skips the import.
+`docker compose down -v` deletes the data.
 
-### 2. Test the Deployment
+To use your own database servers instead of Docker, run the loader scripts in [`src/setup_dbs/`](src/setup_dbs)
+directly; their connection settings are read from environment variables (see each script's config file).
 
-Set up a Python venv or conda environment and install the requirements from `requirements.txt`.
-Use the [test_databases.py](src/test_databases.py) script to test the four databases. If all tests are successful, you
-are good to go.
+### 2. Test the deployment
 
-> NOTE: The data for Neo4J and GraphDB takes a while to be loaded, so check that the GraphDB data is fully loaded, 
-> before running the test. The Neo4J data should be ready by the time the GraphDB is done.
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python src/test_databases.py
+```
+
+The script runs one query per database and exits with code 0 if all four return the expected result.
+Use the same `SM3_*_PORT` variables if you changed a port.
 
 ### 3. Text-to-Query
 
@@ -81,7 +92,7 @@ See [`data/README.md`](data/README.md) for details. Croissant metadata for the d
 
 ## Code
 
-- `./src/docker_configuration` contains the code to set up the four different database systems (PostgreSQL, GraphDB,
+- `./src/setup_dbs` contains the loaders (one per database, each with its Dockerfile) that set up the four database systems (PostgreSQL, GraphDB,
   Neo4j, and MongoDB) and populate them with Synthea data.
 - `./src/run_experiments` contains the code to replicate our experiments for all database models, LLMs, prompts, and
   few-shot sampling (repetitions).

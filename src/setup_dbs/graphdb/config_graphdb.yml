@@ -1,4 +1,10 @@
-server_uri: http://localhost:7200
-repository: sm3
-username: "admin"
-password: "root"
+# Connection defaults for docker compose. Override with the env vars GRAPHDB_URL, GRAPHDB_REPOSITORY,
+# GRAPHDB_USERNAME, GRAPHDB_PASSWORD, TTL_ZIP and SYNTHEA_DATA.
+server_uri: http://sm3-graphdb:7200
+repository: sm3_graphdb
+username: admin
+password: root
+# TTL files that are imported (the exact RDF data used for the paper)
+ttl_zip: /app/data/synthea_ttl.zip
+# Only used with GRAPHDB_CONVERT_FROM_CSV=1
+synthea_data: /app/data/synthea_data

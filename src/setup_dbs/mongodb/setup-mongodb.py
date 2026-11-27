@@ -1,5 +1,6 @@
 import csv
 import logging
+import os
 
 import pymongo
 import argparse
@@ -22,15 +23,30 @@ logger = logging.getLogger(__name__)
 
 config = dict()
 
+
+def make_client():
+    """MongoDB client; env vars override config_mongodb.yml, defaults match docker compose."""
+    return pymongo.MongoClient(
+        host=os.getenv('MONGO_HOST', config.get('host', 'sm3_mongodb')),
+        port=int(os.getenv('MONGO_PORT', config.get('port', 27017))),
+        username=os.getenv('MONGO_USER', config.get('username', 'sm3')),
+        password=os.getenv('MONGO_PASSWORD', config.get('password', 'sm3')),
+        authSource=os.getenv('MONGO_AUTH_SOURCE', config.get('authSource', 'admin')),
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=20000,
+        socketTimeoutMS=20000
+    )
+
+
 class LocalServer(object):
 
     def __init__(self):
-        self.client = pymongo.MongoClient(config['server_uri'])
+        self.client = make_client()
         self.database_name = {}
         self.database = config['database'] if 'database' in config else None
         if self.database is not None:
             self.database_name = self.database
-        self.basepath = config['basepath'] if 'basepath' in config else None
+        self.basepath = os.path.join(os.getenv('SYNTHEA_DATA', config.get('basepath', '/app/data')), '')
         self.collection_names = [
             "organizations",
             "payers",
@@ -73,6 +89,7 @@ class LocalServer(object):
     def create_sm3_database_new(self):
         try:
             self.database = self.client[f'{self.database_name}']
+            print('sm3 created')
             # Insert regular data
             for collection_name in self.collection_names:
 
@@ -650,15 +667,19 @@ class LocalServer(object):
             expected_result = {'first': 'Glendora96', 'last': 'Tillman293'}
             if any(r['first'] == expected_result['first'] and r['last'] == expected_result['last'] for r in results):
                 print("\n✅ Test passed: Found expected patient Glendora96 Tillman293")
+                passed = True
             else:
                 print("\n❌ Test failed: Could not find expected patient Glendora96 Tillman293")
+                passed = False
 
             # Print some basic statistics
             print("\nQuery Statistics:")
             print(f"Total distinct patients: {len(results)}")
+            return passed
 
         except Exception as e:
             print(f"\n❌ Test error occurred: {str(e)}")
+            return False
         finally:
             print("=" * 80)
 
@@ -1017,11 +1038,32 @@ def load_config(configuration):
     with open(configuration) as config_file:
         config = yaml.load(config_file, yaml.SafeLoader)
 
+def wait_for_db(max_retries=60, delay_seconds=2):
+    for attempt in range(max_retries):
+        client = None
+        try:
+            client = make_client()
+            client.admin.command('ping')
+            print("MongoDB connection successful")
+            return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries} to connect to MongoDB failed: {e}")
+            time.sleep(delay_seconds)
+        finally:
+            if client is not None:
+                client.close()
+    return False
 
 def main():
     # Loading specific configuration from the config_mongodb.yml file
-    configuration = 'config_mongodb.yml'
+    configuration = os.getenv('MONGO_CONFIG', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config_mongodb.yml'))
     load_config(configuration)
+    # Wait for mongodb service to be ready before making any other computation:
+    if not wait_for_db():
+        logger.error("Failed to connect to database")
+        raise SystemExit(1)
+
+
     # Definition of specific Local Server object:
     server = LocalServer()
     # Check if the sm3 database exists for mongodb
@@ -1030,31 +1072,25 @@ def main():
         # Check if the respective collections are defined:
         if not server.check_sm3_collections_existence():
             server.create_sm3_collections_corrected()
-            # Database exists but doesn't have all the collections as noted above
-
-            # create missing collections:
-            #print(server.client.list_database_names())
-            #print(server.client[f'{server.database_name}'].list_collection_names())
-            #print(server.check_sm3_database_existence())
-            server.run_mongodb_test()
+            passed = server.run_mongodb_test()
             print("SM3 data and database already exists in database. Import completed.")
             server.close()
-            return
+            raise SystemExit(0 if passed else 1)
         else:
 
             print("SM3 data and database already exists in database. Import skipped.")
-            #server.embedding_update()
-            server.run_mongodb_test()
+            passed = server.run_mongodb_test()
             server.close()
-            return
+            raise SystemExit(0 if passed else 1)
     else:
         # Create the database from scratch
         if not server.create_sm3_database_new():
             print(f"Failed to create database {server.database}")
             server.close()
-            return
-        # both database and data have to be loaded::
-        server.run_mongodb_test()
+            raise SystemExit(1)
+        passed = server.run_mongodb_test()
+        server.close()
+        raise SystemExit(0 if passed else 1)
 
 if __name__ == "__main__":
     main()
